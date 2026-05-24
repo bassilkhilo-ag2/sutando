@@ -89,9 +89,12 @@ class TestGetWaitingQuestions(unittest.TestCase):
         cpq.PQ_FILE.write_text("## Done\n\n**Status:** resolved\n")
         self.assertEqual(cpq.get_waiting_questions(), [])
 
-    def test_no_status_field_excluded(self):
+    def test_no_status_field_included(self):
+        # Post-#1404 free-form convention: sections without **Status:** are open.
         cpq.PQ_FILE.write_text("## No status here\n\nJust text.\n")
-        self.assertEqual(cpq.get_waiting_questions(), [])
+        result = cpq.get_waiting_questions()
+        self.assertEqual(len(result), 1)
+        self.assertIn("No status here", result[0]["title"])
 
     def test_multiple_sections_filtered(self):
         cpq.PQ_FILE.write_text(
