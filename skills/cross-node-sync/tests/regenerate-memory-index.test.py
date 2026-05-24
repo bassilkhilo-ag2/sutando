@@ -26,10 +26,12 @@ from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parent.parent.parent.parent
 
-_spec = importlib.util.spec_from_file_location(
-    "regenerate_memory_index",
-    REPO / "skills" / "cross-node-sync" / "scripts" / "regenerate-memory-index.py",
-)
+_SCRIPT = REPO / "skills" / "cross-node-sync" / "scripts" / "regenerate-memory-index.py"
+if not _SCRIPT.exists():
+    print(f"SKIP: {_SCRIPT.name} not present in this tree (removed in #1108)")
+    sys.exit(0)
+
+_spec = importlib.util.spec_from_file_location("regenerate_memory_index", _SCRIPT)
 rmi = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(rmi)
 
