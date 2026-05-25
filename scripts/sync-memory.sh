@@ -157,6 +157,9 @@ fi
 # additive, so it composes with whatever invocation/deployment layout you choose.
 if [ -n "${SUTANDO_MEMORY_DIR:-}" ]; then
   MEMORY_DIR="${SUTANDO_MEMORY_DIR/#\~/$HOME}"
+elif [ -n "${SUTANDO_PRIVATE_DIR:-}" ]; then
+  echo "sync-memory: SUTANDO_PRIVATE_DIR is deprecated; use SUTANDO_MEMORY_DIR" >&2
+  MEMORY_DIR="${SUTANDO_PRIVATE_DIR/#\~/$HOME}"
 else
   MEMORY_DIR="$HOME/.claude/projects/$(echo "$SCRIPT_PARENT" | sed 's|/|-|g')/memory"
 fi
@@ -191,8 +194,8 @@ if [ -z "$SUTANDO_MEMORY_REPO" ]; then
     exit 0
 fi
 
-# Auto-detect memory dir (may vary by machine)
-if [ ! -d "$MEMORY_DIR" ]; then
+# Auto-detect memory dir (may vary by machine) — skip when explicit override set
+if [ -z "${SUTANDO_MEMORY_DIR:-}" ] && [ -z "${SUTANDO_PRIVATE_DIR:-}" ] && [ ! -d "$MEMORY_DIR" ]; then
     MEMORY_DIR=$(find "$HOME/.claude/projects" -name "memory" -type d 2>/dev/null | head -1)
 fi
 
