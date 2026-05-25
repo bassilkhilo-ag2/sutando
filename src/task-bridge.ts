@@ -14,6 +14,7 @@ import { z } from 'zod';
 import type { ToolDefinition } from 'bodhi-realtime-agent';
 import { resolveWorkspace } from './workspace_default.js';
 import { recordConversation, recordSessionBoundary } from './conversation-store.js';
+import { logEvent } from './event_log.js';
 
 const REPO_DIR = resolveWorkspace();
 const TASK_DIR = join(REPO_DIR, 'tasks');
@@ -324,6 +325,7 @@ export const workTool: ToolDefinition = {
 		// default was producing unwanted DMs). Caller must explicitly pass
 		// dm_on_timeout: true on critical tasks where they want the fallback.
 		_pendingTasks.set(taskId, { submittedAt: Date.now(), timeoutMs, dmOnTimeout: dm_on_timeout === true, taskText: task });
+		logEvent('task.received', { taskId, source: 'voice', snippet: task.slice(0, 80) });
 		// Record owner activity for status-aware-pivot in proactive loop
 		writeOwnerActivity('voice', task);
 		console.log(`${ts()} [TaskBridge] Task ${taskId}: ${task.slice(0, 100)}`);
@@ -594,6 +596,7 @@ export function startResultWatcher(onResult: (result: string) => void, isClientC
 					? `Task '${taskSnippet}' timed out — core agent may be unresponsive`
 					: 'Task timed out — core agent may be unresponsive';
 				_sendTaskStatus?.(taskId, 'timeout', statusMsg);
+				logEvent('task.timedout', { taskId, timeoutMs, snippet: taskSnippet });
 				const minutes = Math.floor(timeoutMs / 60000);
 				const userMsg = taskSnippet
 					? `[Task ${taskId} ('${taskSnippet}') timed out after ${minutes} minutes. The processing engine may need to be restarted.]`
@@ -670,6 +673,7 @@ export function startResultWatcher(onResult: (result: string) => void, isClientC
 				if (file.startsWith('task-') && /^\s*\[deduped:\s*task-/i.test(result)) {
 					console.log(`${ts()} [TaskBridge] ${taskId} is deduped marker; archiving silently`);
 					_sendTaskStatus?.(taskId, 'done', result.slice(0, 60), result);
+					logEvent('task.deduped', { taskId });
 					_deliveredResults.add(file);
 					_pendingTasks.delete(taskId);
 					try {
@@ -740,6 +744,7 @@ export function startResultWatcher(onResult: (result: string) => void, isClientC
 				if (result) {
 					console.log(`${ts()} [TaskBridge] Result ${file}: ${result.slice(0, 100)}`);
 					_sendTaskStatus?.(taskId, 'done', result.slice(0, 60), result);
+					logEvent('task.completed', { taskId, snippet: result.slice(0, 80) });
 					_deliveredResults.add(file);
 					_pendingTasks.delete(taskId);
 					logConversation('core-agent', `[task:${taskId}] ${result.slice(0, LOG_LINE_MAX_CHARS)}`);
