@@ -166,6 +166,24 @@ export function _isVoiceTask(taskId: string): boolean {
 	return false;
 }
 
+/** True if the task body (header lines only, stop at `task:`) indicates a
+ * context-drop task — written either by Sutando.app's writeTask() (no source
+ * field) or by task-bridge's watchContextDrops() (source: context-drop).
+ * These tasks have no bridge consumer; their results must be archived by
+ * task-bridge rather than left queued indefinitely. (#969) */
+export function _isContextDropTaskBody(headerLines: string[]): boolean {
+	const srcLine = headerLines.find(l => l.startsWith('source:'));
+	const src = srcLine ? srcLine.slice(7).trim() : null;
+	const chan = headerLines.find(l => l.startsWith('channel_id:'))?.slice(11).trim() ?? '';
+	const taskLine = headerLines.find(l => l.startsWith('task:'))?.slice(5).trim() ?? '';
+	return (
+		src === null || // no source field = Sutando.app direct writeTask()
+		src === 'context-drop' ||
+		chan === 'local-hotkey' ||
+		taskLine.startsWith('User dropped context via hotkey')
+	);
+}
+
 /** Belt-suspenders guard for the result-watcher's unconditional fallthrough
  * (issue #1035, follow-up to PR #1033). Returns true iff the filename is one
  * that task-bridge legitimately delivers via `onResult()`. Rejects everything
@@ -721,6 +739,32 @@ export function startResultWatcher(onResult: (result: string) => void, isClientC
 							const taskFile = join(TASK_DIR, `${taskId}.txt`);
 							if (existsSync(taskFile)) archiveFile(taskFile, 'tasks', taskId);
 						}, 10_000);
+					}
+					// Context-drop tasks (Sutando.app hotkey or task-bridge watchContextDrops)
+					// have no bridge consumer. Archive result when voice is offline. (#969)
+					if (taskId.startsWith('task-') && !taskId.startsWith('task-chat-')) {
+						const taskFile = join(TASK_DIR, `${taskId}.txt`);
+						let isContextDrop = false;
+						if (existsSync(taskFile)) {
+							try {
+								const headerLines: string[] = [];
+								for (const l of readFileSync(taskFile, 'utf-8').split('\n')) {
+									if (l.startsWith('task:')) { headerLines.push(l); break; }
+									headerLines.push(l);
+								}
+								isContextDrop = _isContextDropTaskBody(headerLines);
+							} catch {}
+						}
+						if (isContextDrop) {
+							_sendTaskStatus?.(taskId, 'done', result.slice(0, 60), result);
+							_deliveredResults.add(file);
+							_pendingTasks.delete(taskId);
+							console.log(`${ts()} [TaskBridge] Context-drop task archived (no client): ${taskId}`);
+							setTimeout(() => {
+								archiveFile(path, 'results', taskId);
+								if (existsSync(taskFile)) archiveFile(taskFile, 'tasks', taskId);
+							}, 10_000);
+						}
 					}
 					// Other non-voice unsent results stay queued (their bridges deliver them)
 					continue;
