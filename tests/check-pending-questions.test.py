@@ -119,10 +119,12 @@ class TestGetWaitingQuestions(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertIn("New question?", result[0]["title"])
 
-    def test_section_without_status_excluded(self) -> None:
+    def test_section_without_status_included(self) -> None:
+        # Post-#1404 free-form convention: sections without **Status:** are open.
         content = "## No status section\n\nJust some text here.\n"
         result = self._pq(content)
-        self.assertEqual(result, [])
+        self.assertEqual(len(result), 1)
+        self.assertIn("No status section", result[0]["title"])
 
     def test_multiple_waiting_questions(self) -> None:
         content = (
