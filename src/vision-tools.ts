@@ -19,7 +19,7 @@
 import { readFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer, type Server } from 'node:http';
 import { z } from 'zod';
@@ -433,9 +433,58 @@ export function submitFrame(data: Buffer, mimeType: string = 'image/jpeg'): { ok
 	}
 }
 
+// Selection-first fix for push mode (#1425): probe AX/Chrome selection each
+// tick and inject it as silent context so the model sees exact text, not just
+// a frame. Deduped: same text is not re-injected until it changes.
+let lastInjectedSelection = '';
+
+function probeSelectedText(): string {
+	try {
+		const ax = execFileSync('osascript', ['-e',
+			`try
+  tell application "System Events" to tell (first process whose frontmost is true)
+    return value of attribute "AXSelectedText" of (first UI element whose AXFocused is true)
+  end tell
+on error
+  return ""
+end try`,
+		], { encoding: 'utf-8', timeout: 3_000 }).trim();
+		if (ax) return ax;
+	} catch { /* native app has no focused editable or AX denied */ }
+	try {
+		const js = execFileSync('osascript', ['-e',
+			`try
+  tell application "Google Chrome" to tell active tab of front window to execute javascript "window.getSelection().toString()"
+on error
+  return ""
+end try`,
+		], { encoding: 'utf-8', timeout: 3_000 }).trim();
+		if (js) return js;
+	} catch { /* Chrome not front, JS disabled, or no selection */ }
+	return '';
+}
+
 async function captureAndSend(source: VisionSource): Promise<{ ok: boolean; error?: string }> {
 	const sendFile = getSendFile();
 	if (!sendFile) return { ok: false, error: 'no active voice session' };
+
+	// Selection-first: inject exact selected text (if any) before the frame.
+	const sel = probeSelectedText();
+	if (sel && sel !== lastInjectedSelection) {
+		const transport = sessionRef?.transport;
+		if (transport && typeof transport.sendContent === 'function') {
+			try {
+				transport.sendContent([{
+					role: 'user',
+					text: `[Context — selected text] The user currently has the following text selected on screen:\n\n${sel}\n\nThis exact text is available; prefer it over reading the frame for accuracy.`,
+				}], false);
+				lastInjectedSelection = sel;
+			} catch { /* best-effort — fall through to frame */ }
+		}
+	} else if (!sel) {
+		lastInjectedSelection = '';
+	}
+
 	const frame = await source.capture();
 	sendFile(frame.data.toString('base64'), frame.mimeType);
 	return { ok: true };
