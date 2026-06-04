@@ -395,18 +395,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if pq_file.exists():
                 import re
                 content = pq_file.read_text()
+                # Honour the `# Resolved` divider — questions below it are done (#1404).
+                active_content = re.split(r'^#\s+Resolved\b', content, maxsplit=1, flags=re.MULTILINE)[0]
                 # Split into sections by ## headers
-                sections = re.split(r'^## ', content, flags=re.MULTILINE)
+                sections = re.split(r'^## ', active_content, flags=re.MULTILINE)
                 for i, section in enumerate(sections):
                     if not section.strip():
                         continue
                     lines = section.strip().split('\n')
                     title = lines[0].strip()
                     body = '\n'.join(lines[1:])
-                    # Skip preamble (sections without question metadata)
-                    if '**Status:**' not in body and '**Options:**' not in body:
-                        continue
-                    # Skip resolved/answered questions
+                    # Skip explicitly resolved/answered questions.
+                    # Free-form sections with no **Status:** field are open by convention (#1404/#1265).
                     if re.search(r'\*\*Status:\*\*\s*(resolved|answered|done|complete)', body, re.IGNORECASE):
                         continue
                     # Extract question text — use body before first metadata field

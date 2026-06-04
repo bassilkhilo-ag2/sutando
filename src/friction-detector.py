@@ -13,6 +13,7 @@ Output: results/friction-{date}.txt
 
 import json
 import os
+import re
 import sys
 import subprocess
 from datetime import datetime, timedelta
@@ -46,17 +47,21 @@ def check_pending_questions():
     if "(No pending questions)" in content or not content.strip():
         return []
 
+    # Honour the `# Resolved` divider — questions below it are done (#1404).
+    active_content = re.split(r'^#\s+Resolved\b', content, maxsplit=1, flags=re.MULTILINE)[0]
+
     issues = []
     today = datetime.now().date()
 
-    # Walk sections — each starts with `## Title`. Inside the section, look
-    # for `Status: unanswered` and an `Asked:` date.
+    # Walk sections — each starts with `## Title`. Treat sections with no
+    # **Status:** field as unanswered (free-form prose convention, #1265/#1404).
     current_title = None
     current_asked = None
-    current_status = None
+    current_status = None  # None = no status field seen (= open by convention)
 
     def flush():
-        if current_title and current_status == "unanswered":
+        _resolved = {"answered", "resolved", "done", "complete"}
+        if current_title and current_status not in _resolved:
             age_str = ""
             if current_asked:
                 try:
@@ -67,13 +72,13 @@ def check_pending_questions():
                     pass
             issues.append(f"Pending question unanswered{age_str}: {current_title[:80]}")
 
-    for line in content.split("\n"):
+    for line in active_content.split("\n"):
         stripped = line.strip()
         if stripped.startswith("## "):
             flush()
             current_title = stripped[3:].strip()
             current_asked = None
-            current_status = None
+            current_status = None  # reset: no status seen yet
             continue
         # Match `- **Asked:** 2026-04-06`
         if "**Asked:**" in stripped:
@@ -81,7 +86,7 @@ def check_pending_questions():
                 current_asked = stripped.split("**Asked:**", 1)[1].strip().split()[0]
             except IndexError:
                 pass
-        # Match `- **Status:** unanswered`
+        # Match `- **Status:** unanswered` or `**Status:** answered` etc.
         if "**Status:**" in stripped:
             try:
                 current_status = stripped.split("**Status:**", 1)[1].strip().lower().split()[0]
