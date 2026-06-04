@@ -1,0 +1,16 @@
+name: AGENTS.md sync check
+
+on:
+  pull_request:
+    paths:
+      - CLAUDE.md
+      - AGENTS.md
+      - scripts/agents-md-sync.sh
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify AGENTS.md is in sync with CLAUDE.md
+        run: bash scripts/agents-md-sync.sh --check
