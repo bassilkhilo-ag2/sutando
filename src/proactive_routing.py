@@ -46,7 +46,7 @@ from pathlib import Path
 # `github-commits`, anything else) returned False for BOTH bridges,
 # silently stranding the proactive file in `results/` until the
 # next discord/telegram message restored a known activity channel.
-BRIDGE_CHANNELS = frozenset({"discord", "telegram"})
+BRIDGE_CHANNELS = frozenset({"discord", "telegram", "slack"})
 
 
 def should_claim_proactive(state_file_path: Path, this_channel: str) -> bool:

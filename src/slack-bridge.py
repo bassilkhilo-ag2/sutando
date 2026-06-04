@@ -728,31 +728,38 @@ def result_watcher():
                 archive_file(find_task_file(TASKS_DIR, task_id) or TASKS_DIR / f"{task_id}.txt", "tasks", task_id)
 
             # Proactive messages (sent to owner DM)
+            # Guard: only claim when Slack is the last-active channel.
+            # Mirrors discord-bridge's proactive_routing check — prevents
+            # the cross-bridge race where slack-bridge claims a
+            # [channel: <discord_id>] proactive file and delivers the
+            # literal marker text to the Slack DM (issue #1401).
             if not presenter_mode_active():
-                for f in list(RESULTS_DIR.iterdir()):
-                    if not (f.name.startswith("proactive-") and f.suffix == ".txt"):
-                        continue
-                    claim = f.with_suffix(".sending")
-                    try:
-                        f.rename(claim)
-                    except FileNotFoundError:
-                        continue
-                    text = claim.read_text().strip()
-                    if not text:
-                        claim.unlink(missing_ok=True)
-                        continue
-                    owner_ids = load_allowed()
-                    if owner_ids:
-                        owner_id = next(iter(owner_ids))
-                        # Open a DM channel to the owner (idempotent).
+                from proactive_routing import should_claim_proactive  # noqa: E402
+                if should_claim_proactive(OWNER_ACTIVITY_FILE, "slack"):
+                    for f in list(RESULTS_DIR.iterdir()):
+                        if not (f.name.startswith("proactive-") and f.suffix == ".txt"):
+                            continue
+                        claim = f.with_suffix(".sending")
                         try:
-                            resp = app.client.conversations_open(users=owner_id)
-                            dm_channel = resp["channel"]["id"]
-                            _send_reply(dm_channel, None, text)
-                            print(f"  [proactive] sent to {owner_id}: {text[:80]}", flush=True)
-                        except Exception as e:
-                            print(f"  [proactive] failed: {e}", flush=True)
-                    claim.unlink(missing_ok=True)
+                            f.rename(claim)
+                        except FileNotFoundError:
+                            continue
+                        text = claim.read_text().strip()
+                        if not text:
+                            claim.unlink(missing_ok=True)
+                            continue
+                        owner_ids = load_allowed()
+                        if owner_ids:
+                            owner_id = next(iter(owner_ids))
+                            # Open a DM channel to the owner (idempotent).
+                            try:
+                                resp = app.client.conversations_open(users=owner_id)
+                                dm_channel = resp["channel"]["id"]
+                                _send_reply(dm_channel, None, text)
+                                print(f"  [proactive] sent to {owner_id}: {text[:80]}", flush=True)
+                            except Exception as e:
+                                print(f"  [proactive] failed: {e}", flush=True)
+                        claim.unlink(missing_ok=True)
 
             # Heartbeat (used by health-check.py)
             now = time.time()

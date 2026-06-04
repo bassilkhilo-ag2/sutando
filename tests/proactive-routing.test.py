@@ -177,28 +177,42 @@ def test_github_commits_channel_defaults_to_discord():
     _with_state({"channel": "github-commits", "ts": 1779339000}, run)
 
 
-def test_unrecognized_channel_defaults_to_discord():
-    """Generalization: an arbitrary non-bridge channel name (e.g.
-    `"slack"`, `"matrix"`, future channels not yet implemented) also
-    defaults to Discord rather than stranding the message. The pre-
-    fix behavior was strict equality which silently dropped the
-    proactive — exactly the bug @rickchen007 identified."""
+def test_slack_active_routes_to_slack():
+    """Symmetric: Slack-recent activity → Slack bridge claims, Discord
+    and Telegram skip. Added when slack-bridge adopted the routing
+    guard (issue #1401) and BRIDGE_CHANNELS gained "slack"."""
 
     def run(state):
-        assert should_claim_proactive(state, "discord") is True
+        assert should_claim_proactive(state, "slack") is True
+        assert should_claim_proactive(state, "discord") is False
         assert should_claim_proactive(state, "telegram") is False
 
     _with_state({"channel": "slack", "ts": 1779339000}, run)
 
 
+def test_unrecognized_channel_defaults_to_discord():
+    """Generalization: an arbitrary non-bridge channel name (e.g.
+    `"matrix"`, future channels not yet implemented) also defaults to
+    Discord rather than stranding the message. The pre-fix behavior was
+    strict equality which silently dropped the proactive — exactly the
+    bug @rickchen007 identified."""
+
+    def run(state):
+        assert should_claim_proactive(state, "discord") is True
+        assert should_claim_proactive(state, "telegram") is False
+        assert should_claim_proactive(state, "slack") is False
+
+    _with_state({"channel": "matrix", "ts": 1779339000}, run)
+
+
 def test_bridge_channels_set_is_documented():
     """Pin the BRIDGE_CHANNELS constant: a future contributor adding
-    a new bridge (e.g. matrix) must update both this constant AND
-    add a corresponding `test_<channel>_active_routes_to_<channel>`.
+    a new bridge must update both this constant AND add a corresponding
+    `test_<channel>_active_routes_to_<channel>`.
     Without this pin, the constant could silently widen and break the
     "non-bridge defaults to Discord" contract."""
     from proactive_routing import BRIDGE_CHANNELS
-    assert BRIDGE_CHANNELS == frozenset({"discord", "telegram"}), (
+    assert BRIDGE_CHANNELS == frozenset({"discord", "telegram", "slack"}), (
         f"BRIDGE_CHANNELS changed to {BRIDGE_CHANNELS!r}. If you added a "
         f"new bridge, add a corresponding routing test AND update this "
         f"assertion deliberately."
@@ -215,6 +229,7 @@ def main():
     test_state_file_non_dict_root_defaults_to_discord()
     test_voice_channel_defaults_to_discord()
     test_github_commits_channel_defaults_to_discord()
+    test_slack_active_routes_to_slack()
     test_unrecognized_channel_defaults_to_discord()
     test_bridge_channels_set_is_documented()
     print("All proactive-routing tests passed.")
