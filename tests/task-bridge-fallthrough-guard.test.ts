@@ -55,8 +55,19 @@ describe('_shouldFallthrough — belt-suspenders guard for result-watcher fallth
 		assert.equal(_shouldFallthrough('proactive-timeout-task-abc-1234.txt'), true);
 	});
 
+	it('allows voice-delivery result types written by proactive scripts', () => {
+		// question-: check-pending-questions.py:132 writes results/question-{ts}.txt
+		// insight-: daily-insight.py writes results/insight-{date}.txt
+		// friction-: friction-detector.py writes results/friction-{date}.txt
+		// briefing-: morning-briefing skill writes results/briefing-{date}.txt
+		// All four are explicitly intended to be spoken by the voice agent.
+		assert.equal(_shouldFallthrough('question-1234567890.txt'), true);
+		assert.equal(_shouldFallthrough('insight-2026-06-05.txt'), true);
+		assert.equal(_shouldFallthrough('friction-2026-06-05.txt'), true);
+		assert.equal(_shouldFallthrough('briefing-morning.txt'), true);
+	});
+
 	it('rejects unknown / unfamiliar prefixes', () => {
-		assert.equal(_shouldFallthrough('question-1234567890.txt'), false);
 		assert.equal(_shouldFallthrough('something-else.txt'), false);
 		assert.equal(_shouldFallthrough('.hidden.txt'), false);
 		assert.equal(_shouldFallthrough('readme.txt'), false);

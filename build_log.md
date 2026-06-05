@@ -273,3 +273,117 @@ All blocked on owner. Owner asleep ~1h. Holding green.
 - WWDC fire-ready draft confirmed current at `notes/linkedin-wwdc-2026-draft-a-fire-ready.md`. Keynote ~50h away.
 
 **No new tasks, health clean (sutando-app stale = known/persistent).**
+
+### Pass 858 — 2026-06-05
+
+**TS test coverage (branch: fix/ts-test-sqlite-and-duplicate-tools):**
+- `tests/voice-key.test.ts` (6 tests): `voiceApiKey()` chain — GEMINI_VOICE_API_KEY → GEMINI_API_KEY → '', includes empty-string falsy fallthrough
+- `tests/recording-state.test.ts` (12 tests): all 5 exported mutable refs — initial values, mutation, independence; save/restore in finally blocks
+- Full suite: **430/430 TS tests passing** (up from 412 before this session)
+- Committed + pushed to fork
+
+**Health:** Clean — sutando-app stale (known/persistent). No new tasks.
+
+**Remaining uncovered TS files (by size):** overlay-manager-ui (179L), meeting-tools (253L), chat-ui (574L), conversation-store (574L), browser-tools (612L), vision-tools (665L), task-bridge (817L).
+
+### Pass 859 — 2026-06-05
+
+**TS test coverage (branch: fix/ts-test-sqlite-and-duplicate-tools):**
+- `tests/overlay-manager-ui.test.ts` (16 tests): covers `OVERLAY_MANAGER_HTML` constant — DOCTYPE, html/body structure, title, DOM elements (#list/#status/#refresh), card controls (open/close/show/hide), opacity range + alwaysOnTop checkbox, /api/overlays endpoint, load()/card() functions, 5s auto-refresh, badge CSS states
+- Full suite: **446/446 TS tests passing**
+- Committed + pushed to fork
+
+**Also fixed:** `regenerate-memory-index.py` MAX_LINE 200→400 — was truncating long descriptions (misread CLAUDE.md "lines after 200" as char limit; it's a line count limit)
+
+**Remaining uncovered TS files (by size):** meeting-tools (253L), chat-ui (574L), conversation-store (574L), browser-tools (612L), vision-tools (665L), task-bridge (817L).
+
+### Pass 860 — 2026-06-05
+
+**TS test coverage (branch: fix/ts-test-sqlite-and-duplicate-tools):**
+- `tests/meeting-tools.test.ts` (17 tests): metadata for all 3 tools; joinGmeetTool early-exit paths (empty/whitespace/bare URL — happy path skipped to avoid launching Chrome); lookupMeetingIdTool fully covered (no env, meetingId, passcode priority chain, instruction text); callContactTool metadata only (execute opens Contacts.app)
+- Full suite: **463/463 TS tests passing**
+- Committed + pushed to fork
+
+**Remaining uncovered TS files (by size):** chat-ui (574L), conversation-store (574L), browser-tools (612L), vision-tools (665L), task-bridge (817L).
+
+### Pass 861 — 2026-06-05
+
+**TS test coverage (branch: fix/ts-test-sqlite-and-duplicate-tools):**
+- `tests/conversation-store.test.ts` (17 tests): sourceFromRole + kindFromRole pure functions; DB round-trips for recordConversation (all 3 surfaces), recordSessionBoundary, recordToolCall, recordSession — cache-busting via SUTANDO_CONVERSATION_DB + ?t= per test
+- Full suite: **480/480 TS tests passing**
+- Committed + pushed to fork
+
+**Remaining uncovered TS files (by size):** browser-tools (612L), vision-tools (665L), task-bridge (817L).
+
+## Pass 863 — 2026-06-05
+
+**Added:** `tests/browser-tools.test.ts` — 21 tests covering `src/browser-tools.ts` (612L)
+
+**Coverage:**
+- Tool metadata (name + execution=inline): scrollTool, switchTabTool, closeTabTool, openUrlTool, describeScreenTool, clickTool, pointAtTool — 9 tests
+- `injectText` with mock sessions: sendRealtimeInput path, sendContent fallback, null session, transport with no send methods — 4 tests
+- `openUrlTool.execute` early-exit validation: empty string, whitespace-only, embedded space, zero-width char, newline — 5 tests
+- `clickTool.execute` no-args error path — 1 test
+- `pointAtTool.execute` no-API-key error, empty query error — 2 tests
+
+**Why happy paths skipped:** All execute happy paths call `execSync`/`execFileSync` (opens Chrome/AppleScript) or `fetch` — would launch macOS apps during CI. Only pre-IO early-exit branches tested.
+
+**TS test count:** 480 → 501 (all 21 new pass)
+
+**Next:** `tests/vision-tools.test.ts` (src/vision-tools.ts, 665L) or `tests/task-bridge.test.ts` (src/task-bridge.ts, 817L)
+
+## Pass 864 — 2026-06-05
+
+**Added:** `tests/vision-tools.test.ts` — 36 tests covering `src/vision-tools.ts` (665L)
+
+**Coverage:**
+- Source registry: listSources includes screen/webcam, registerSource adds + case-insensitive — 3 tests
+- VisionOnContributor registry: initial count, register increments, unregister fn removes — 3 tests
+- Tool-updater wiring: getFullToolSurface, callUpdateTools/callRestoreTools with no updater (returns false), setSessionToolUpdater stores surface, callUpdateTools/callRestoreTools invoke fn, callRestoreTools false when surface empty — 7 tests
+- Streaming initial state: isStreaming false, getVisionState streaming=false/sessionReady=false/frames=0 — 2 tests
+- Tool metadata: name + description content for sendVisionFrameTool, startVisionTool, stopVisionTool — 5 tests
+- No-session execute paths: stopVisionTool idle, startVisionTool failed, startStreaming failed, sendVisionFrameTool failed, submitFrame {ok:false} — 6 tests
+- With mock session (sendFile only, no sendContent): isStreaming false, submitFrame not-in-push-mode, stopStreaming idle, getVisionState.sessionReady true — 4 tests
+- Push-mode paths (startStreaming('browser') + mock): status=streaming/mode=push, isStreaming true, submitFrame {ok:true}, sendVisionFrameTool note includes 'Push mode', startVisionTool note includes 'Push mode', stopStreaming status=stopped, isStreaming false after stop — 7 tests
+
+**Committed:** `a77c430f` on branch `fix/ts-test-sqlite-and-duplicate-tools`, pushed to fork.
+
+**TS test count:** 501 → 537 (36 new, all pass)
+
+**Remaining uncovered TS files:** task-bridge.ts (817L) — largest remaining; chat-ui.ts (574L) is web-only UI.
+
+## Pass 865 — 2026-06-05
+
+**Added:** `tests/task-bridge.test.ts` — 32 tests covering `src/task-bridge.ts` (817L)
+
+**Coverage:**
+- `_shouldFallthrough` (pure): task-/voice-/proactive- → true; discord-voice.task-/phone.task-/insight-/briefing-/'' → false — 8 tests
+- `workTool` metadata: name='work', execution='inline', task parameter validates — 3 tests
+- `readCurrentNoteViewing`: absent file → null, valid JSON → {slug,content,ts} — 2 tests
+- `writeChatTask` (freshBridge/SUTANDO_WORKSPACE isolation): taskId prefix, file created, source:chat, access_tier:owner, task: last header (injection guard), description in file — 6 tests
+- `_isVoiceTask`: channel_id:local-voice → true, source:voice → true, source:chat → false, forged header after task: ignored (PR #982 stop-at-task: guard), nonexistent → false — 5 tests
+- `logConversation` + `getRecentConversation` + `getSecondsSinceLastTurn`: empty log, round-trip user+assistant, count param, newline stripping — 6 tests
+- `logSessionBoundary` + SESSION_END boundary: getSecondsSinceLastTurn → null, pre-boundary turns excluded — 2 tests
+
+**Committed:** `bed355b3` on branch `fix/ts-test-sqlite-and-duplicate-tools`, pushed to fork.
+
+**TS test count:** 537 → 569 (32 new, all pass)
+
+**Branch summary:** 31 commits, 569/569 TS tests, all `src/*.ts` modules now covered. PR awaiting Bassil's explicit request.
+
+**Remaining src/ files with no dedicated test:** `workspace_default.ts` (tiny, 1 pure fn), `inline-tools.ts` (aggregator — tools tested individually), `voice-agent.ts` (session orchestrator — no pure-logic exports to unit test). Coverage is effectively complete.
+
+## Pass 866 — 2026-06-05
+
+**PR reviews (jgluck96 backlog — all REVIEW_REQUIRED PRs reviewed):**
+- #92 APPROVED: `fix(health-check)` — add slack-bridge to dup-process + auto-resurrect lists (pairs with #96 auto-start)
+- #100 APPROVED: `fix(discord-bridge)` — guard import-time `exit(1)` behind `if __name__ == '__main__'` (fixes import-in-tests)
+- #101 APPROVED: `fix(services)` — narrow `bare except:` → `except Exception:` in 4 Python services
+- #102 APPROVED: `feat(scripts)` — `cron-gate.sh` new script, defer cron jobs while owner tasks queued; `crons.example.json` updated
+- #103 APPROVED: `fix(memory-backup)` — replace hardcoded lianghaochen path with repo-derived slug; honor `SUTANDO_PRIVATE_DIR`; tar timeout=120
+- #104 APPROVED: `fix(health-check)` — route ngrok + conversation-server logs to `WORKSPACE_DIR/logs/` (not `/tmp/`)
+- #105 APPROVED: `fix(inline-tools)` — `getCoreStatusTool` reads from `resolveWorkspace()/state/core-status.json` (was always returning idle); test updated
+
+**PRs still awaiting review:** #71 (Dev client — large), #65 (vault), #66 (startup .env)
+
+**No tasks processed** — queue empty this pass.

@@ -183,7 +183,20 @@ export function _isVoiceTask(taskId: string): boolean {
  * Exported for unit testing — the watcher's setInterval body is otherwise
  * awkward to exercise in isolation. */
 export function _shouldFallthrough(file: string): boolean {
-	return file.startsWith('task-') || file.startsWith('voice-') || file.startsWith('proactive-');
+	// task-/voice-/proactive-: core task pipeline
+	// question-/insight-/friction-/briefing-: result files written by proactive scripts
+	// that the voice client must speak aloud when connected (check-pending-questions.py,
+	// daily-insight.py, friction-detector.py, morning-briefing skill). Without these,
+	// voice delivery silently drops all four result types.
+	return (
+		file.startsWith('task-') ||
+		file.startsWith('voice-') ||
+		file.startsWith('proactive-') ||
+		file.startsWith('question-') ||
+		file.startsWith('insight-') ||
+		file.startsWith('friction-') ||
+		file.startsWith('briefing-')
+	);
 }
 
 const _apiToken = process.env.SUTANDO_API_TOKEN || '';

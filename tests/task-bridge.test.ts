@@ -77,12 +77,20 @@ test('_shouldFallthrough: phone.task- prefix → false', () => {
 	assert.equal(_shouldFallthrough('phone.task-1234.txt'), false);
 });
 
-test('_shouldFallthrough: insight- prefix → false', () => {
-	assert.equal(_shouldFallthrough('insight-2026.txt'), false);
+test('_shouldFallthrough: question- prefix → true (check-pending-questions.py voice delivery)', () => {
+	assert.equal(_shouldFallthrough('question-1234567890.txt'), true);
 });
 
-test('_shouldFallthrough: briefing- prefix → false (current implementation)', () => {
-	assert.equal(_shouldFallthrough('briefing-morning.txt'), false);
+test('_shouldFallthrough: insight- prefix → true (daily-insight.py voice delivery)', () => {
+	assert.equal(_shouldFallthrough('insight-2026.txt'), true);
+});
+
+test('_shouldFallthrough: friction- prefix → true (friction-detector.py voice delivery)', () => {
+	assert.equal(_shouldFallthrough('friction-2026.txt'), true);
+});
+
+test('_shouldFallthrough: briefing- prefix → true (morning-briefing skill voice delivery)', () => {
+	assert.equal(_shouldFallthrough('briefing-morning.txt'), true);
 });
 
 test('_shouldFallthrough: empty string → false', () => {
