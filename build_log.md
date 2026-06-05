@@ -1,4 +1,13 @@
 
+## Pass 857 — 2026-06-05
+
+**Branch fix/ts-test-sqlite-and-duplicate-tools (24 commits):**
+- Commit 22: `tests/voice-config-switch.test.ts` — 12 TS tests (tool metadata, unknown preset → error, "search"/"no-search" return values, config file written to workspace/config/voice-agent.json, defaults merged, JSON format, dir creation, summary text)
+- Commit 23: `tests/artifact-cache-tools.test.ts` — 18 TS tests (set/query/clearActiveArtifact tools: metadata, missing file, plain/md/ts/csv load, sections, ~ expansion, query keyword/section/no-match, artifact_id+line_range in result)
+- Branch now: 24 commits, **412/412 TS tests pass**, 30 new tests this pass, 460 total new tests
+- TS files newly covered: voice-config-switch.ts, artifact-cache-tools.ts
+- No PR yet — awaiting Bassil.
+
 ## Pass 856 — 2026-06-05
 
 **Branch fix/ts-test-sqlite-and-duplicate-tools (21 commits, pushed to fork):**
