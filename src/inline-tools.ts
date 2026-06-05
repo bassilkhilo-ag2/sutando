@@ -1010,8 +1010,9 @@ async function loadSkillManifestTools(): Promise<{ owner: ToolDefinition[]; anyC
 		const expanded = privateRoot.replace(/^~/, process.env.HOME || '');
 		dirsToScan.push(join(expanded, 'skills'));
 	}
-	const owner: ToolDefinition[] = [];
-	const anyCaller: ToolDefinition[] = [];
+	// Maps keyed by tool name for last-write-wins dedup across skill dirs.
+	const ownerMap = new Map<string, ToolDefinition>();
+	const anyCallerMap = new Map<string, ToolDefinition>();
 	for (const skillsDir of dirsToScan) {
 		if (!existsSync(skillsDir)) continue;
 		let dirs: string[];
@@ -1041,15 +1042,23 @@ async function loadSkillManifestTools(): Promise<{ owner: ToolDefinition[]; anyC
 				// @ts-ignore — dynamic relative import resolved at runtime by tsx
 				const mod = await import(toolsPath);
 				if (Array.isArray(mod.tools)) {
-					(tier === 'any_caller' ? anyCaller : owner).push(...mod.tools);
-					console.log(`[skill-loader] loaded ${mod.tools.length} tool(s) from ${manifest.name || dirName} [tier=${tier}] (${skillsDir})`);
+					const target = tier === 'any_caller' ? anyCallerMap : ownerMap;
+					let loaded = 0;
+					for (const tool of mod.tools as ToolDefinition[]) {
+						if (target.has(tool.name)) {
+							console.log(`[skill-loader] overwriting '${tool.name}' with version from ${dirName} in ${skillsDir}`);
+						}
+						target.set(tool.name, tool);
+						loaded++;
+					}
+					console.log(`[skill-loader] loaded ${loaded} tool(s) from ${manifest.name || dirName} [tier=${tier}] (${skillsDir})`);
 				}
 			} catch (err) {
 				console.warn(`[skill-loader] failed to import ${dirName}/${manifest.tools} from ${skillsDir}:`, err instanceof Error ? err.message : err);
 			}
 		}
 	}
-	return { owner, anyCaller };
+	return { owner: [...ownerMap.values()], anyCaller: [...anyCallerMap.values()] };
 }
 const personalTools = await loadSkillManifestTools();
 const personalAllTools = [...personalTools.owner, ...personalTools.anyCaller];
