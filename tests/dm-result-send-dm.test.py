@@ -97,6 +97,13 @@ def _restore_transport(original):
 
 def _with_access_json(content, fn):
     original = dm.ACCESS_JSON
+    # Isolate from production discord-config.json. resolve_owner_id() calls
+    # discord_config.load_config() (step 2 — workspace `owner` field) which
+    # reads the real workspace file and wins before tierMap (step 5) is
+    # ever checked. Patching to {} forces the test to exercise the tierMap
+    # and bot-filter paths the test was written to cover.
+    orig_load_config = dm.discord_config.load_config
+    dm.discord_config.load_config = lambda: {}
     tmp = Path(tempfile.mkdtemp(prefix="sutando-dm-test-")) / "access.json"
     tmp.write_text(json.dumps(content))
     dm.ACCESS_JSON = tmp
@@ -104,6 +111,7 @@ def _with_access_json(content, fn):
         fn()
     finally:
         dm.ACCESS_JSON = original
+        dm.discord_config.load_config = orig_load_config
         tmp.unlink()
         tmp.parent.rmdir()
 
