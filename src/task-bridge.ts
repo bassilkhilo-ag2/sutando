@@ -707,6 +707,61 @@ export function startResultWatcher(onResult: (result: string) => void, isClientC
 					}, 5_000);
 					continue;
 				}
+				// [no-send] / [REPLIED] skip markers (#1381 item 2) — archive
+				// silently without narrating to voice. Mirrors Python bridges
+				// that honor these via parse_markers() → ("skip", reason).
+				if (/^\s*\[no-send\]/i.test(result) || /^\s*\[REPLIED\]/.test(result)) {
+					const _skipReason = /^\s*\[no-send\]/i.test(result) ? 'no-send' : 'REPLIED';
+					console.log(`${ts()} [TaskBridge] ${taskId} skip-marker [${_skipReason}]; archiving silently`);
+					_sendTaskStatus?.(taskId, 'done', result.slice(0, 60), result);
+					_deliveredResults.add(file);
+					_pendingTasks.delete(taskId);
+					try {
+						fetch('http://localhost:7843/task-done', {
+							method: 'POST',
+							headers: _apiHeaders(),
+							body: JSON.stringify({ taskId, result }),
+						}).catch(() => {});
+					} catch {}
+					setTimeout(() => {
+						archiveFile(path, 'results', taskId);
+						const taskFile = join(TASK_DIR, `${taskId}.txt`);
+						if (existsSync(taskFile)) archiveFile(taskFile, 'tasks', taskId);
+					}, 5_000);
+					continue;
+				}
+				// [channel: <id>] redirect (#1381 item 2) — route result to a
+				// Discord/Slack channel instead of narrating to voice. Writes a
+				// proactive-{ts}.txt file so discord-bridge delivers to the
+				// specified channel. Mirrors conversation-server.ts implementation.
+				const _tbChannelMatch = /^\s*\[channel:\s*([^\]]+)\]\s*\n?/.exec(result);
+				if (_tbChannelMatch) {
+					const _tbChannelId = _tbChannelMatch[1].trim();
+					const _tbBody = result.slice(_tbChannelMatch[0].length).trim();
+					const _tbProactivePath = join(RESULT_DIR, `proactive-${Date.now()}.txt`);
+					try {
+						writeFileSync(_tbProactivePath, `[channel: ${_tbChannelId}]\n${_tbBody}`);
+						console.log(`${ts()} [TaskBridge] ${taskId} channel-redirect → ${_tbChannelId}`);
+					} catch (e) {
+						console.error(`${ts()} [TaskBridge] channel-redirect write failed for ${taskId}:`, e);
+					}
+					_sendTaskStatus?.(taskId, 'done', result.slice(0, 60), result);
+					_deliveredResults.add(file);
+					_pendingTasks.delete(taskId);
+					try {
+						fetch('http://localhost:7843/task-done', {
+							method: 'POST',
+							headers: _apiHeaders(),
+							body: JSON.stringify({ taskId, result }),
+						}).catch(() => {});
+					} catch {}
+					setTimeout(() => {
+						archiveFile(path, 'results', taskId);
+						const taskFile = join(TASK_DIR, `${taskId}.txt`);
+						if (existsSync(taskFile)) archiveFile(taskFile, 'tasks', taskId);
+					}, 5_000);
+					continue;
+				}
 				// Voice client offline → forward voice-task results to Discord DM
 				// via a proactive-result-*.txt file (poll_proactive in
 				// discord-bridge.py picks it up and DMs the owner). Skips files
