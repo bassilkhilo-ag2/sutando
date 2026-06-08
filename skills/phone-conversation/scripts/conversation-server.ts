@@ -452,6 +452,26 @@ function delegateTask(callSession: CallSession, taskDescription: string): Promis
 			// Cache result so duplicate requests get instant replay
 			if (!callSession.taskResultCache) callSession.taskResultCache = new Map();
 			callSession.taskResultCache.set(taskDescription, result);
+			// [channel: <id>] redirect — route result to a Discord/Slack channel
+			// instead of narrating it to the caller (#1381 item 3). Mirrors
+			// result_markers.py _REDIRECT_RE; phone was the one surface that
+			// didn't honor this marker.
+			const _channelMatch = /^\s*\[channel:\s*([^\]]+)\]\s*\n?/.exec(result);
+			if (_channelMatch) {
+				const _channelId = _channelMatch[1].trim();
+				const _body = result.slice(_channelMatch[0].length).trim();
+				const _proactivePath = join(RESULTS_DIR, `proactive-${Date.now()}.txt`);
+				try {
+					writeFileSync(_proactivePath, `[channel: ${_channelId}]\n${_body}`);
+					console.log(`${ts()} [Task] ${taskId} channel-redirect → ${_channelId}`);
+				} catch (e) {
+					console.error(`${ts()} [Task] channel-redirect write failed for ${taskId}:`, e);
+				}
+				callSession.resultQueue.push({
+					text: `[Task result for "${taskDescription}"]\nForwarded. Nothing else to report to the caller.`,
+				});
+				return;
+			}
 			// Anti-hallucination wrapping. See sonichi/sutando#1244 — Gemini
 			// was filling silence with plausible-sounding fabrications when
 			// the work tool returned empty/sparse content. Two layers:
