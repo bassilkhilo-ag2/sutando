@@ -395,6 +395,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if pq_file.exists():
                 import re
                 content = pq_file.read_text()
+                # Strip everything below `# Resolved` divider (#1402 convention).
+                content = re.split(r'^#\s+Resolved\b', content, maxsplit=1, flags=re.MULTILINE)[0]
                 # Split into sections by ## headers
                 sections = re.split(r'^## ', content, flags=re.MULTILINE)
                 for i, section in enumerate(sections):
@@ -403,10 +405,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     lines = section.strip().split('\n')
                     title = lines[0].strip()
                     body = '\n'.join(lines[1:])
-                    # Skip preamble (sections without question metadata)
-                    if '**Status:**' not in body and '**Options:**' not in body:
-                        continue
-                    # Skip resolved/answered questions
+                    # Skip resolved/answered questions; free-form sections with no
+                    # **Status:** field are treated as unanswered (#1265 convention).
                     if re.search(r'\*\*Status:\*\*\s*(resolved|answered|done|complete)', body, re.IGNORECASE):
                         continue
                     # Extract question text — use body before first metadata field
@@ -719,26 +719,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     # Find the right section by matching the question ID
                     sections = re.split(r'(^## )', content, flags=re.MULTILINE)
                     new_content = content
+                    # Strip resolved divider so IDs match the GET handler.
+                    active_content = re.split(r'^#\s+Resolved\b', content, maxsplit=1, flags=re.MULTILINE)[0]
                     # Reconstruct and find the section matching this qid
-                    idx = 0
-                    for si, section in enumerate(re.split(r'^## ', content, flags=re.MULTILINE)):
+                    for si, section in enumerate(re.split(r'^## ', active_content, flags=re.MULTILINE)):
                         if not section.strip():
                             continue
                         lines = section.strip().split('\n')
                         title = lines[0].strip()
                         body = '\n'.join(lines[1:])
-                        if '**Status:**' not in body and '**Options:**' not in body:
-                            continue
+                        # Skip sections already resolved/answered (#1265: no-status = open)
                         if re.search(r'\*\*Status:\*\*\s*(resolved|answered|done|complete)', body, re.IGNORECASE):
                             continue
-                        idx += 1
                         if f"Q{si}" == qid:
-                            # Match any waiting/unanswered status line
-                            new_body = re.sub(
-                                r'\*\*Status:\*\*\s*(?:Waiting|unanswered).*',
-                                f'**Status:** Answered — {safe_answer}',
-                                body
-                            )
+                            # Update an existing **Status:** field, or append one for
+                            # free-form sections that never had a status line.
+                            if re.search(r'\*\*Status:\*\*', body):
+                                new_body = re.sub(
+                                    r'\*\*Status:\*\*\s*(?:Waiting|unanswered).*',
+                                    f'**Status:** Answered — {safe_answer}',
+                                    body,
+                                )
+                            else:
+                                new_body = body.rstrip('\n') + f'\n- **Status:** Answered — {safe_answer}\n'
                             if new_body != body:
                                 new_content = content.replace(body, new_body)
                             break

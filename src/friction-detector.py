@@ -29,16 +29,12 @@ RESULTS_DIR = WORKSPACE / "results"
 def check_pending_questions():
     """Find questions unanswered for >24h.
 
-    pending-questions.md uses sections like:
-        ## Question Title
-        - **Asked:** 2026-04-06
-        - **Question:** ...
-        - **Status:** unanswered
-
-    A previous version of this parser looked for lines starting with `- [`
-    which never matched the actual format, so it always returned an empty
-    list and friction-detector silently missed every unanswered question.
+    pending-questions.md uses free-form `## Title` sections (no **Status:**
+    field — see #1265). A section without a **Status:** field is treated as
+    unanswered; a section with **Status:** resolved/answered/done is skipped.
+    Everything below a `# Resolved` top-level divider is ignored (#1402).
     """
+    import re as _re
     pq = Path(personal_path("pending-questions.md", WORKSPACE))
     if not pq.exists():
         return []
@@ -46,17 +42,21 @@ def check_pending_questions():
     if "(No pending questions)" in content or not content.strip():
         return []
 
+    # Strip everything at and below the `# Resolved` divider so answered
+    # questions aren't re-counted as stale.
+    content = _re.split(r'^#\s+Resolved\b', content, maxsplit=1, flags=_re.MULTILINE)[0]
+
     issues = []
     today = datetime.now().date()
 
-    # Walk sections — each starts with `## Title`. Inside the section, look
-    # for `Status: unanswered` and an `Asked:` date.
+    _RESOLVED_STATUSES = {"resolved", "answered", "done", "complete"}
+
     current_title = None
     current_asked = None
-    current_status = None
+    current_status = None  # None means no **Status:** field → treat as unanswered
 
     def flush():
-        if current_title and current_status == "unanswered":
+        if current_title and current_status not in _RESOLVED_STATUSES:
             age_str = ""
             if current_asked:
                 try:
@@ -81,7 +81,7 @@ def check_pending_questions():
                 current_asked = stripped.split("**Asked:**", 1)[1].strip().split()[0]
             except IndexError:
                 pass
-        # Match `- **Status:** unanswered`
+        # Match `- **Status:** unanswered` (or any explicit status)
         if "**Status:**" in stripped:
             try:
                 current_status = stripped.split("**Status:**", 1)[1].strip().lower().split()[0]
