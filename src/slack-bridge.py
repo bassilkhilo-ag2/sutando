@@ -50,6 +50,7 @@ from result_markers import parse_markers  # noqa: E402
 from workspace_default import resolve_workspace  # noqa: E402
 from task_archive import find_task_file  # noqa: E402
 from single_instance import acquire as _single_instance_acquire  # noqa: E402
+from secret_redact import redact_secrets  # noqa: E402
 
 try:
     from slack_bolt import App
@@ -437,6 +438,10 @@ def _write_task(event: dict, prefix: str, text: str, username: str | None) -> st
             f"For 'other' tier: information-only replies about Sutando itself. "
             f"Write the sandboxed output to `results/{{task_id}}.txt` as the user-facing reply.\n"
         )
+
+    user_task_text, _secrets = redact_secrets(user_task_text)
+    if _secrets:
+        print(f"  [secret-redact] redacted from Slack task: {', '.join(_secrets)}", flush=True)
 
     ts = int(time.time() * 1000)
     task_id = f"task-{ts}"

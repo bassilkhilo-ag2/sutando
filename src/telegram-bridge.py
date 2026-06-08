@@ -37,6 +37,7 @@ from result_markers import parse_markers  # noqa: E402
 from workspace_default import resolve_workspace  # noqa: E402
 from task_archive import find_task_file  # noqa: E402
 from single_instance import acquire as _single_instance_acquire  # noqa: E402
+from secret_redact import redact_secrets  # noqa: E402
 REPO = resolve_workspace()
 TASKS_DIR = REPO / "tasks"
 RESULTS_DIR = REPO / "results"
@@ -535,6 +536,11 @@ def main():
                 print(f"  @{username}{forward_note}: {text}{attachment_note}")
 
                 # Write as task (same format as voice bridge)
+                task_text = f"[Telegram @{username}{forward_note}] {text}{attachment_note}"
+                task_text, _secrets = redact_secrets(task_text)
+                if _secrets:
+                    print(f"  [secret-redact] redacted from Telegram task: {', '.join(_secrets)}", flush=True)
+
                 ts = int(time.time() * 1000)
                 task_id = f"task-{ts}"
                 task_file = TASKS_DIR / f"{task_id}.txt"
@@ -542,7 +548,7 @@ def main():
                 task_file.write_text(
                     f"id: {task_id}\n"
                     f"timestamp: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
-                    f"task: [Telegram @{username}{forward_note}] {text}{attachment_note}\n"
+                    f"task: {task_text}\n"
                     f"source: telegram\n"
                     f"chat_id: {chat_id}\n"
                     f"priority: {priority}\n"

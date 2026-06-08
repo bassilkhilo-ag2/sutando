@@ -59,6 +59,7 @@ from util_paths import shared_personal_path  # noqa: E402
 from task_priority import default_priority_for_source  # noqa: E402
 from task_archive import find_task_file  # noqa: E402
 from result_markers import parse_markers  # noqa: E402
+from secret_redact import redact_secrets  # noqa: E402
 REPO = resolve_workspace()
 
 # discord-voice "magic word" join trigger (issue: za-warudo summon). The
@@ -2830,6 +2831,10 @@ async def _handle_discord_message(message, force=False):
                 await message.add_reaction(react_emoji)
             except Exception as e:
                 print(f"  [auto-react] {react_emoji} failed: {e}", flush=True)
+
+    user_task_text, _secrets = redact_secrets(user_task_text)
+    if _secrets:
+        print(f"  [secret-redact] redacted from Discord task: {', '.join(_secrets)}", flush=True)
 
     priority = default_priority_for_source("discord", access_tier)
     # channel_name / guild_name: human-readable labels so the task-consumer can
