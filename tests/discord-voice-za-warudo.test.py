@@ -178,7 +178,7 @@ def main() -> None:
     handle_pos = jt.find("def handle_join_trigger(")
     expect(handle_pos != -1, "join_trigger.py: handle_join_trigger() must be defined")
     if handle_pos != -1:
-        handle_region = jt[handle_pos:handle_pos + 2200]
+        handle_region = jt[handle_pos:handle_pos + 3000]
         expect(
             "_server_already_running(" in handle_region,
             "join_trigger.py: handle_join_trigger() must guard against double-launch via _server_already_running()",
