@@ -17,9 +17,10 @@ the future import. The bridge crashed silently on every Mac running stock python
 
 This test is the CI gate that prevents the same class of regression.
 
-Scan scope: `src/*.py` (primary). Skills and tests are excluded — they're not launched
-by `startup.sh` directly and the scan would produce too much noise from third-party
-vendored code.
+Scan scope: `src/*.py` and `skills/**/*.py`. Tests are excluded. Skills were originally
+excluded on the assumption of vendored noise, but all 31 skill .py files are first-party;
+the scope was expanded in #1386 after three separate PEP-604 fixes in skills/ were missed
+by the gate (#960, #1068, #1385).
 
 Run: python3 tests/python39-union-annotations.test.py
 Exit: 0 on pass, 1 on fail.
@@ -32,6 +33,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src"
+SKILLS = REPO / "skills"
 
 
 def _contains_bitor(node: ast.expr) -> bool:
@@ -98,8 +100,9 @@ def check_file(path: Path) -> str | None:
 
 def test_no_bare_union_annotations() -> None:
     failures = []
-    for path in sorted(SRC.glob("*.py")):
-        if "/__pycache__/" in str(path):
+    paths = sorted(SRC.glob("*.py")) + sorted(SKILLS.glob("**/*.py"))
+    for path in paths:
+        if "/__pycache__/" in str(path) or "/node_modules/" in str(path):
             continue
         msg = check_file(path)
         if msg:
