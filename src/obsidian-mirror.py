@@ -41,7 +41,8 @@ def resolve_workspace() -> Path:
     return Path.home() / ".sutando" / "workspace"
 
 
-TASK_ID_RE = re.compile(r"^task-(.+)\.txt$")
+# [^.]+ excludes claimed files (task-123.claimed-core-N.txt) — dots only appear in the suffix
+TASK_ID_RE = re.compile(r"^task-([^.]+)\.txt$")
 
 
 def _ensure_vault(vault: Path) -> None:
